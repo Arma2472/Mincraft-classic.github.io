@@ -1,0 +1,49 @@
+name: Extract Downloads.zip
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Extract zip archive
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          archive = Path("Downloads.zip")
+          root = Path.cwd().resolve()
+
+          if not archive.exists():
+              raise SystemExit("Downloads.zip not found")
+
+          with ZipFile(archive) as zf:
+              for info in zf.infolist():
+                  target = (root / info.filename).resolve()
+                  if target != root and root not in target.parents:
+                      raise SystemExit(f"Blocked path: {info.filename}")
+              zf.extractall(root)
+          print("Archive extracted.")
+          PY
+
+      - name: Commit extracted files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- assets
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Extract Downloads.zip"
+            git push
+          fi
